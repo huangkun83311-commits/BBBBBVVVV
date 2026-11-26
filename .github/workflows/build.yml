@@ -16,24 +16,43 @@ jobs:
       - name: 拉代码
         uses: actions/checkout@v4
 
-      - name: 装 Theos + iOS SDK
+      - name: 装 Theos + 工具链 + SDK
         run: |
+          set -e
           sudo apt-get update -qq
-          sudo apt-get install -y -qq make git curl zip unzip fakeroot dpkg
+          sudo apt-get install -y -qq build-essential fakeroot rsync curl perl zip unzip git libxml2-utils libtinfo6 dpkg xz-utils
+
           export THEOS=$HOME/theos
           echo "THEOS=$THEOS" >> $GITHUB_ENV
           echo "$THEOS/bin" >> $GITHUB_PATH
-          git clone --recursive --depth 1 https://github.com/theos/theos.git "$THEOS"
+
+          # 1) theos 本体
+          if [ ! -d "$THEOS/makefiles" ]; then
+            git clone --recursive --depth 1 https://github.com/theos/theos.git "$THEOS"
+          fi
+
+          # 2) Linux 工具链（官方脚本用的就是这个）
+          if [ ! -x "$THEOS/toolchain/linux/iphone/bin/clang" ]; then
+            curl -sL https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain-x86_64.tar.xz \
+              | tar -xJ -C "$THEOS/toolchain/"
+          fi
+
+          # 3) SDK
           mkdir -p "$THEOS/sdks"
-          git clone --depth 1 https://github.com/theos/sdks.git /tmp/sdks
-          cp -r /tmp/sdks/*.sdk "$THEOS/sdks/" 2>/dev/null || true
-          ls -1 "$THEOS/sdks"
-          ls -1 "$THEOS/makefiles" | head -5
+          if ! ls "$THEOS"/sdks/*.sdk >/dev/null 2>&1; then
+            "$THEOS/bin/install-sdk" latest || true
+          fi
+          if ! ls "$THEOS"/sdks/*.sdk >/dev/null 2>&1; then
+            git clone --depth 1 https://github.com/theos/sdks.git /tmp/sdks
+            cp -r /tmp/sdks/*.sdk "$THEOS/sdks/"
+          fi
 
       - name: 环境检查
         run: |
           echo "THEOS=$THEOS"
-          make --version | head -1
+          ls -1 "$THEOS/toolchain/linux/iphone/bin" | head -8
+          "$THEOS/toolchain/linux/iphone/bin/clang" --version | head -2
+          ls -1 "$THEOS/sdks"
           which ldid || ls -l "$THEOS/bin/ldid" || true
 
       - name: 编译
