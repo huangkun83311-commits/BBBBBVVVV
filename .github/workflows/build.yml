@@ -5,6 +5,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,7 +19,7 @@ jobs:
       - name: 装 Theos + iOS SDK
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq make git curl zip unzip fakeroot dpkg libplist-utils
+          sudo apt-get install -y -qq make git curl zip unzip fakeroot dpkg
           export THEOS=$HOME/theos
           echo "THEOS=$THEOS" >> $GITHUB_ENV
           echo "$THEOS/bin" >> $GITHUB_PATH
@@ -25,29 +28,39 @@ jobs:
           git clone --depth 1 https://github.com/theos/sdks.git /tmp/sdks
           cp -r /tmp/sdks/*.sdk "$THEOS/sdks/" 2>/dev/null || true
           ls -1 "$THEOS/sdks"
-          "$THEOS/bin/ldid" -h >/dev/null 2>&1 && echo "ldid 可用" || echo "ldid 缺失"
+          ls -1 "$THEOS/makefiles" | head -5
 
       - name: 环境检查
         run: |
           echo "THEOS=$THEOS"
-          ls -1 "$THEOS/sdks" || true
           make --version | head -1
-          ldid -h 2>&1 | head -2 || true
+          which ldid || ls -l "$THEOS/bin/ldid" || true
 
       - name: 编译
         run: |
-          make clean || true
-          make -j"$(nproc)" FINALPACKAGE=1
-          find .theos -name "bs_unlock.dylib" -ls
+          set -o pipefail
+          make clean > /dev/null 2>&1 || true
+          make -j"$(nproc)" FINALPACKAGE=1 2>&1 | tee build.log
 
-      - name: 签名（复用原包 entitlements）
+      - name: 失败回推日志
+        if: failure()
+        run: |
+          git config --global user.name ci
+          git config --global user.email ci@local
+          tail -c 20000 build.log > build.tail 2>/dev/null || true
+          git checkout -B ci-log
+          git add -f build.tail
+          git commit -m "ci log $(date -u +%H:%M:%S)" || true
+          git push -f origin ci-log || true
+
+      - name: 签名
         run: |
           D=$(find .theos -name "bs_unlock.dylib" | head -1)
           echo "dylib = $D"
           ldid -S bs_unlock.ent.plist "$D"
-          ldid -l "$D" | head -30 || true
+          ldid -l "$D" | head -20 || true
 
-      - name: 打 deb（可选，失败不影响 dylib）
+      - name: 打 deb
         continue-on-error: true
         run: make package FINALPACKAGE=1
 

@@ -6,7 +6,7 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = bs_unlock
 bs_unlock_FILES = Tweak.xm
-bs_unlock_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-everything
+bs_unlock_CFLAGS = -fobjc-arc -w
 bs_unlock_FRAMEWORKS = Foundation
 
 include $(THEOS_MAKE_PATH)/tweak.mk

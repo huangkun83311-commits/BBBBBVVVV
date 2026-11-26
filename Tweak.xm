@@ -2,15 +2,21 @@
 // conf: /var/mobile/Media/bs_pull.conf   log: /var/mobile/Media/bs_bridge.log
 
 #import <Foundation/Foundation.h>
+#import <stdarg.h>
+#import <stdint.h>
+#import <time.h>
+#import <string.h>
+#import <stdlib.h>
+#import <unistd.h>
+#import <dispatch/dispatch.h>
 #import <mach-o/dyld.h>
 #import <mach/mach.h>
 #import <mach/vm_map.h>
 #import <libkern/OSCacheControl.h>
 #import <sys/stat.h>
 #import <dlfcn.h>
-#import <string.h>
-#import <stdlib.h>
-#import <unistd.h>
+
+#define BS_PAGE 0x4000      // iOS arm64 页大小 16KB，不依赖 PAGE_SIZE 宏
 
 #define CONF_PATH   "/var/mobile/Media/bs_pull.conf"
 #define DATA_DIR    "/var/mobile/Media/BetaScreenTYMDESUJCX8T"
@@ -129,12 +135,12 @@ static int BSPatchRet(long off) {
     if (off <= 0) return -1;
     uintptr_t base = (uintptr_t)_dyld_get_image_vmaddr_slide(0);
     uintptr_t addr = base + (uintptr_t)off;
-    vm_address_t page = addr & ~(vm_address_t)(PAGE_SIZE - 1);
-    if (vm_protect(mach_task_self(), page, PAGE_SIZE, FALSE,
+    vm_address_t page = addr & ~(vm_address_t)(BS_PAGE - 1);
+    if (vm_protect(mach_task_self(), page, BS_PAGE, FALSE,
                    VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY) != KERN_SUCCESS)
         return -2;
     *(volatile uint32_t *)addr = 0xd65f03c0;   // ret
-    vm_protect(mach_task_self(), page, PAGE_SIZE, FALSE,
+    vm_protect(mach_task_self(), page, BS_PAGE, FALSE,
                VM_PROT_READ | VM_PROT_EXECUTE);
     sys_icache_invalidate((void *)addr, 4);
     BSLog("patch ret @ +0x%lx", off);
