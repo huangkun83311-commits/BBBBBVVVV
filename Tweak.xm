@@ -153,7 +153,7 @@ static NSData *BSHttpGet(NSString *url, NSTimeInterval timeout) {
     dispatch_semaphore_t sem = dispatch_semaphore_create(0);
     NSURLSessionConfiguration *c = [NSURLSessionConfiguration ephemeralSessionConfiguration];
     c.timeoutIntervalForRequest = timeout;
-    c.URLRequestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
+    c.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
     NSURLSession *s = [NSURLSession sessionWithConfiguration:c];
     [[s dataTaskWithURL:[NSURL URLWithString:url]
        completionHandler:^(NSData *d, NSURLResponse *r, NSError *e) {
