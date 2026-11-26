@@ -1,0 +1,8 @@
+Package: com.akun.bsunlock
+Name: AKUN Card Bridge
+Description: 自有卡密桥接，替代 com.bspath.core 的授权层
+Version: 0.1.0
+Architecture: iphoneos-arm64
+Maintainer: akun
+Author: akun
+Section: Tweaks

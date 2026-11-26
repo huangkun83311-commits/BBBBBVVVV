@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>platform-application</key>
+	<true/>
+	<key>com.apple.private.security.container-required</key>
+	<false/>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>apple</string>
+	</array>
+	<key>com.apple.private.security.storage-exempt.heritable</key>
+	<true/>
+	<key>com.apple.security.iokit-user-client-class</key>
+	<array>
+		<string>AGXCommandQueue</string>
+		<string>AGXDevice</string>
+		<string>AGXDeviceUserClient</string>
+		<string>AGXSharedUserClient</string>
+		<string>AppleCredentialManagerUserClient</string>
+		<string>AppleJPEGDriverUserClient</string>
+		<string>ApplePPMUserClient</string>
+		<string>AppleSPUHIDDeviceUserClient</string>
+		<string>AppleSPUHIDDriverUserClient</string>
+		<string>IOAccelContext</string>
+		<string>IOAccelContext2</string>
+		<string>IOAccelDevice</string>
+		<string>IOAccelDevice2</string>
+		<string>IOAccelSharedUserClient</string>
+		<string>IOAccelSharedUserClient2</string>
+		<string>IOAccelSubmitter2</string>
+		<string>IOHIDEventServiceFastPathUserClient</string>
+		<string>IOHIDLibUserClient</string>
+		<string>IOMobileFramebufferUserClient</string>
+		<string>IOReportUserClient</string>
+		<string>IOSurfaceAcceleratorClient</string>
+		<string>IOSurfaceRootUserClient</string>
+		<string>RootDomainUserClient</string>
+		<string>IOGPUDeviceUserClient</string>
+	</array>
+	<key>com.apple.QuartzCore.global-capture</key>
+	<true/>
+	<key>com.apple.QuartzCore.secure-capture</key>
+	<true/>
+</dict>
+</plist>

@@ -1,0 +1,59 @@
+name: build-bs-unlock
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: theos/theos:latest
+
+    steps:
+      - name: 拉代码
+        uses: actions/checkout@v4
+
+      - name: 环境检查
+        run: |
+          echo "THEOS=$THEOS"
+          ls -1 "$THEOS/sdks" 2>/dev/null || echo "(sdks 目录为空)"
+
+      - name: 缺 SDK 自动补
+        continue-on-error: true
+        run: |
+          if [ -z "$(ls -A "$THEOS/sdks" 2>/dev/null)" ]; then
+            "$THEOS/bin/theos-sdk" install iphoneos 16.5
+          fi
+
+      - name: 编译
+        run: |
+          make clean || true
+          make -j"$(nproc)" FINALPACKAGE=1
+          find .theos -name "bs_unlock.dylib" -ls
+
+      - name: 签名（复用原包 entitlements）
+        run: |
+          D=$(find .theos -name "bs_unlock.dylib" | head -1)
+          echo "dylib = $D"
+          ldid -S bs_unlock.ent.plist "$D"
+          ldid -l "$D" | head -30 || true
+
+      - name: 打 deb（可选，失败不影响 dylib）
+        continue-on-error: true
+        run: make package FINALPACKAGE=1
+
+      - name: 收集产物
+        run: |
+          mkdir -p out
+          find .theos -name "bs_unlock.dylib" -exec cp {} out/ \;
+          cp bs_unlock.plist bs_unlock.ent.plist out/ 2>/dev/null || true
+          find . -maxdepth 3 -name "*.deb" -exec cp {} out/ \;
+          ls -l out
+
+      - name: 上传
+        uses: actions/upload-artifact@v4
+        with:
+          name: bs_unlock-build
+          path: out/
+          if-no-files-found: error
