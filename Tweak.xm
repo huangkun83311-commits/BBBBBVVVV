@@ -116,14 +116,9 @@ static void BSApplyAuth(int st, long long vt, const char *card) {
     p = dlsym(RTLD_DEFAULT, "g_agent_auth_valid_time");
     if (p) *(volatile int64_t *)p = vt;
 
-    // g_agent_activate_card : char *
-    if (card && card[0]) {
-        p = dlsym(RTLD_DEFAULT, "g_agent_activate_card");
-        if (p) {
-            char *dup = strdup(card);
-            *(volatile char **)p = dup;
-        }
-    }
+    // g_agent_activate_card 是 NSString* 全局，写 C 字符串会让 Agent 调 objc 消息时崩，
+    // 卡密显示改由卡槽文件 bs_card.txt 的 card= 字段提供，这里不碰。
+
     g_autorized = st;
     g_expire = vt;
     BSLog("apply auth st=%d vt=%lld card=%.12s (sym %s)",
