@@ -1,24 +1,6 @@
-// =====================================================================
-//  bs_unlock —— AKUN 自有卡密桥接（同构替代 bspath core）
-//  注入目标：BetaScreenTYMDESUJCX8TAgent / BetaScreenTYMDESUJCX8T
-//
-//  实现的 4 件事：
-//    1) 卡槽：把服务器下发的卡/到期写进 bs_card.txt（Agent 启动会清零，所以按 tick 回写）
-//    2) 授权：dlsym 直接写 Agent 的 g_agent_auth_state / g_agent_auth_valid_time / g_agent_activate_card
-//    3) 心跳：GET /hb?key=<devid>&cc=<card>，按返回的 code/expire 决定放行还是锁死
-//        code=0  -> 授权有效
-//        code=3  -> 只保留到期时间给中控显示，auth 置 0
-//        其他    -> 视为拒绝
-//    4) 兜底：符号被 strip 时，按 conf 里的偏移把 getter 改成 ret（默认关闭）
-//
-//  配置：/var/mobile/Media/bs_pull.conf
-//    host / port / prj / tick / cardval / devid
-//    vt_off / st_off  （十六进制偏移，0 表示不打补丁）
-//
-//  编译：make clean && make
-//        产物 .theos/obj/arm64e/bs_unlock.dylib
-//        ldid -S bs_unlock.ent.plist bs_unlock.dylib
-// =====================================================================
+// bs_unlock 注入层：卡槽写回 / 授权投放 / 心跳判定
+// conf: /var/mobile/Media/bs_pull.conf   log: /var/mobile/Media/bs_bridge.log
+
 #import <Foundation/Foundation.h>
 #import <mach-o/dyld.h>
 #import <mach/mach.h>

@@ -7,3 +7,4 @@ out/
 # 私钥/本地配置
 secret.key
 bs_pull.conf
+README.local.md
