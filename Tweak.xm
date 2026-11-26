@@ -2,6 +2,7 @@
 // conf: /var/mobile/Media/bs_pull.conf   log: /var/mobile/Media/bs_bridge.log
 
 #import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 #import <stdarg.h>
 #import <stdint.h>
 #import <time.h>
@@ -207,6 +208,48 @@ static void BSHbOnce(void) {
     }
 }
 
+// ---------------- 自动启动服务（等价于点开 App 里的“启动服务”开关）----------------
+// App 首页只有一个 UISwitch(v_service_control_switch)，action 为 click_service_control_switch:
+static UISwitch *BSFindSwitch(UIView *v, int depth) {
+    if (!v || depth > 40) return nil;
+    if ([v isKindOfClass:[UISwitch class]]) return (UISwitch *)v;
+    for (UIView *s in [v subviews]) {
+        UISwitch *r = BSFindSwitch(s, depth + 1);
+        if (r) return r;
+    }
+    return nil;
+}
+
+static int g_autoStarted = 0;
+
+static void BSTryAutoStart(void) {
+    if (g_autoStarted) return;
+    UIWindow *key = nil;
+    for (UIWindow *w in [[UIApplication sharedApplication] windows]) {
+        if (w.isKeyWindow) { key = w; break; }
+    }
+    if (!key) {
+        for (UIWindow *w in [[UIApplication sharedApplication] windows]) { key = w; break; }
+    }
+    UISwitch *sw = BSFindSwitch(key, 0);
+    if (!sw) { BSLog("autostart: no switch yet"); return; }
+    if (sw.isOn) { g_autoStarted = 1; BSLog("autostart: service already on"); return; }
+    [sw setOn:YES animated:NO];
+    [sw sendActionsForControlEvents:UIControlEventValueChanged];
+    g_autoStarted = 1;
+    BSLog("autostart: flipped service switch on");
+}
+
+static void BSAutoStartScheduler(void) {
+    // App 冷启动 UI 要几秒才建好，前 20 秒内多试几次，成功即停
+    for (int i = 1; i <= 10; i++) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 2.0 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            @autoreleasepool { BSTryAutoStart(); }
+        });
+    }
+}
+
 // ---------------- 入口 ----------------
 __attribute__((constructor))
 static void BSInit(void) {
@@ -227,7 +270,7 @@ static void BSInit(void) {
         }
         if (exp0 > 0) BSApplyAuth((int)(exp0 > time(NULL)), exp0, card0[0] ? card0 : g_cfg.card);
 
-        if (!isAgent) return;   // 监控端只注入显示，不发请求
+        if (!isAgent) { BSAutoStartScheduler(); return; }   // App 端：自动拨开启动服务开关
 
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
             while (1) {
