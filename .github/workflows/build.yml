@@ -111,3 +111,20 @@ jobs:
           git add -f build.tail
           git commit -m "ci log $(date -u +%H:%M:%S)" || true
           git push -f origin ci-log || true
+
+      - name: 发布到 dist 分支
+        if: always()
+        run: |
+          set -e
+          mkdir -p /tmp/dist
+          cp -r out/* /tmp/dist/ 2>/dev/null || true
+          ls -l /tmp/dist
+          git checkout -B dist
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r /tmp/dist/. .
+          ls -l
+          git add -A
+          git config --global user.name ci
+          git config --global user.email ci@local
+          git commit -m "dist $(date -u +%Y%m%d-%H%M%S)" || true
+          git push -f origin dist
