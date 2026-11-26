@@ -61,39 +61,53 @@ jobs:
           make clean > /dev/null 2>&1 || true
           make -j"$(nproc)" FINALPACKAGE=1 2>&1 | tee build.log
 
-      - name: 失败回推日志
-        if: failure()
-        run: |
-          git config --global user.name ci
-          git config --global user.email ci@local
-          tail -c 20000 build.log > build.tail 2>/dev/null || true
-          git checkout -B ci-log
-          git add -f build.tail
-          git commit -m "ci log $(date -u +%H:%M:%S)" || true
-          git push -f origin ci-log || true
-
       - name: 签名
+        continue-on-error: true
         run: |
+          set -x
           D=$(find .theos -name "bs_unlock.dylib" | head -1)
-          echo "dylib = $D"
-          ldid -S bs_unlock.ent.plist "$D"
-          ldid -l "$D" | head -20 || true
+          echo "dylib=$D"
+          LDID="$THEOS/bin/ldid"
+          if [ ! -x "$LDID" ]; then LDID=$(command -v ldid || true); fi
+          if [ -z "$LDID" ] || [ ! -x "$LDID" ]; then
+            curl -sL https://github.com/ProcursusTeam/ldid/releases/latest/download/ldid_linux_x86_64 -o /tmp/ldid
+            chmod +x /tmp/ldid; LDID=/tmp/ldid
+          fi
+          echo "LDID=$LDID"
+          "$LDID" -S bs_unlock.ent.plist "$D" 2>&1 | tee -a ci.log
+          "$LDID" -l "$D" 2>&1 | head -20 | tee -a ci.log
+        env:
+          THEOS: ${{ env.THEOS }}
 
       - name: 打 deb
         continue-on-error: true
-        run: make package FINALPACKAGE=1
+        run: make package FINALPACKAGE=1 2>&1 | tee -a ci.log
 
       - name: 收集产物
+        if: always()
         run: |
           mkdir -p out
           find .theos -name "bs_unlock.dylib" -exec cp {} out/ \;
           cp bs_unlock.plist bs_unlock.ent.plist out/ 2>/dev/null || true
           find . -maxdepth 3 -name "*.deb" -exec cp {} out/ \;
           ls -l out
+          ( cat build.log; echo "-----"; cat ci.log ) > ci_all.txt 2>/dev/null || true
 
       - name: 上传
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: bs_unlock-build
           path: out/
           if-no-files-found: error
+
+      - name: 回推日志
+        if: always()
+        run: |
+          git config --global user.name ci
+          git config --global user.email ci@local
+          { cat build.log 2>/dev/null; echo "===== SIGN/PKG ====="; cat ci.log 2>/dev/null; } | tail -c 25000 > build.tail
+          git checkout -B ci-log
+          git add -f build.tail
+          git commit -m "ci log $(date -u +%H:%M:%S)" || true
+          git push -f origin ci-log || true
