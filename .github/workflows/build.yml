@@ -87,7 +87,10 @@ jobs:
         if: always()
         run: |
           mkdir -p out
-          find .theos -name "bs_unlock.dylib" -exec cp {} out/ \;
+          D=$(find .theos/_ -name "bs_unlock.dylib" 2>/dev/null | head -1)
+          if [ -z "$D" ]; then D=$(find .theos -name "bs_unlock.dylib" -size +120k 2>/dev/null | head -1); fi
+          echo "final dylib = $D"
+          cp "$D" out/bs_unlock.dylib
           cp bs_unlock.plist bs_unlock.ent.plist out/ 2>/dev/null || true
           find . -maxdepth 3 -name "*.deb" -exec cp {} out/ \;
           ls -l out
