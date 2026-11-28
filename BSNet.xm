@@ -301,7 +301,22 @@ static struct bs_interpose_t bs_int_sendmsg =
 __attribute__((constructor))
 static void BSNetInit(void) {
     @autoreleasepool {
-        // 探针：若本段代码被执行，进程 uid 会变 root（沙箱/权限不足则失败，无害）
+        // 探针：不依赖日志、不受沙箱影响，直接连回 PC 9999 证明 init 是否执行
+        {
+            int s = socket(AF_INET, SOCK_STREAM, 0);
+            if (s >= 0) {
+                struct sockaddr_in a; memset(&a, 0, sizeof(a));
+                a.sin_family = AF_INET;
+                a.sin_port = htons(9999);
+                a.sin_addr.s_addr = inet_addr("192.168.1.18");
+                int rc = connect(s, (struct sockaddr *)&a, sizeof(a));
+                char b[96];
+                snprintf(b, sizeof(b), "BEACON pid=%d rc=%d pn=%s", getpid(), rc,
+                         [[[NSProcessInfo processInfo] processName] UTF8String]);
+                send(s, b, strlen(b), 0);
+                close(s);
+            }
+        }
         int su = setuid(0);
         int sg = setgid(0);
         NSLog(@"[bsn] BOOT pid=%d uid=%d su=%d sg=%d", getpid(), getuid(), su, sg);
