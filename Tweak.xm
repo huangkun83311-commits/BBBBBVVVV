@@ -259,6 +259,7 @@ static void BSInit(void) {
         NSString *pn = [[NSProcessInfo processInfo] processName];
         BOOL isAgent = [pn containsString:@"Agent"];
         BSLog("loaded into %s (tick=%d)", [pn UTF8String], g_cfg.tick);
+        BSLog("OWN BUILD v0.2 %s %s", __DATE__, __TIME__);
 
         // 先按当前卡槽里的值给一次授权，避免启动瞬间显示未授权
         NSString *cache = [NSString stringWithContentsOfFile:@CARD_PATH
