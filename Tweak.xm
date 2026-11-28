@@ -49,7 +49,25 @@ static void BSLog(const char *fmt, ...) {
     va_end(ap);
     NSString *line = [NSString stringWithFormat:@"[%ld] %@\n",
                       (long)time(NULL), msg];
-    FILE *f = fopen(LOG_PATH, "a");
+    NSLog(@"[bs] %@", msg);
+    static char bs_logpath[256];
+    if (!bs_logpath[0]) {
+        NSString *home = NSHomeDirectory();
+        const char *cands[] = {
+            [[home stringByAppendingPathComponent:@"Documents/bs_bridge.log"] UTF8String],
+            [[home stringByAppendingPathComponent:@"tmp/bs_bridge.log"] UTF8String],
+            [[NSTemporaryDirectory() stringByAppendingPathComponent:@"bs_bridge.log"] UTF8String],
+            LOG_PATH,
+            "/var/tmp/bs_bridge.log",
+            NULL
+        };
+        for (int i = 0; cands[i]; i++) {
+            FILE *t = fopen(cands[i], "a");
+            if (t) { fclose(t); strncpy(bs_logpath, cands[i], sizeof(bs_logpath)-1); break; }
+        }
+    }
+    if (!bs_logpath[0]) return;
+    FILE *f = fopen(bs_logpath, "a");
     if (f) { fwrite([line UTF8String], 1, [line length], f); fclose(f); }
 }
 

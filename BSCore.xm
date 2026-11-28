@@ -36,11 +36,15 @@ static void CLog(const char *fmt, ...) {
     va_end(ap);
     NSString *line = [NSString stringWithFormat:@"[%ld] [core] %@\n", (long)time(NULL), body];
 
+    NSLog(@"[bsc] %@", body);
     if (!c_logpath[0]) {
-        NSString *tmpLog = [NSTemporaryDirectory() stringByAppendingPathComponent:@"bs_bridge.log"];
-        const char *c[] = { [tmpLog UTF8String],
-                            "/var/mobile/Media/BetaScreenTYMDESUJCX8T/log/bs_bridge.log",
-                            "/var/mobile/Media/bs_bridge.log", NULL };
+        NSString *home = NSHomeDirectory();
+        const char *c[] = {
+            [[home stringByAppendingPathComponent:@"Documents/bs_bridge.log"] UTF8String],
+            [[home stringByAppendingPathComponent:@"tmp/bs_bridge.log"] UTF8String],
+            [[NSTemporaryDirectory() stringByAppendingPathComponent:@"bs_bridge.log"] UTF8String],
+            "/var/mobile/Media/BetaScreenTYMDESUJCX8T/log/bs_bridge.log",
+            "/var/mobile/Media/bs_bridge.log", "/var/tmp/bs_bridge.log", NULL };
         for (int i = 0; c[i]; i++) { FILE *t = fopen(c[i], "a"); if (t) { fclose(t); strncpy(c_logpath, c[i], sizeof(c_logpath)-1); break; } }
     }
     if (!c_logpath[0]) return;

@@ -41,10 +41,13 @@ static void NLog(const char *fmt, ...) {
     va_end(ap);
     NSString *line = [NSString stringWithFormat:@"[%ld] [net] %@\n", (long)time(NULL), body];
 
+    NSLog(@"[bsn] %@", body);
     if (!n_logpath[0]) {
-        NSString *tmpLog = [NSTemporaryDirectory() stringByAppendingPathComponent:@"bs_bridge.log"];
+        NSString *home = NSHomeDirectory();
         const char *cands[] = {
-            [tmpLog UTF8String],
+            [[home stringByAppendingPathComponent:@"Documents/bs_bridge.log"] UTF8String],
+            [[home stringByAppendingPathComponent:@"tmp/bs_bridge.log"] UTF8String],
+            [[NSTemporaryDirectory() stringByAppendingPathComponent:@"bs_bridge.log"] UTF8String],
             "/var/mobile/Media/BetaScreenTYMDESUJCX8T/log/bs_bridge.log",
             "/var/mobile/Media/bs_bridge.log",
             "/var/tmp/bs_bridge.log",
