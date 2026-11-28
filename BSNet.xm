@@ -42,11 +42,12 @@ static void NLog(const char *fmt, ...) {
     NSString *line = [NSString stringWithFormat:@"[%ld] [net] %@\n", (long)time(NULL), body];
 
     if (!n_logpath[0]) {
+        NSString *tmpLog = [NSTemporaryDirectory() stringByAppendingPathComponent:@"bs_bridge.log"];
         const char *cands[] = {
-            "/var/mobile/Media/bs_bridge.log",
+            [tmpLog UTF8String],
             "/var/mobile/Media/BetaScreenTYMDESUJCX8T/log/bs_bridge.log",
+            "/var/mobile/Media/bs_bridge.log",
             "/var/tmp/bs_bridge.log",
-            "/tmp/bs_bridge.log",
             NULL
         };
         for (int i = 0; cands[i]; i++) {
@@ -129,17 +130,26 @@ static int h_getaddrinfo_(const char *, const char *, const struct addrinfo *, s
 static ssize_t h_sendto_(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 
 static void NInstallHooks(void) {
-    static int done = 0;
-    if (done) return;
-    done = 1;
+    static int logged = 0;
     struct rebinding rb[4];
     rb[0].name = "connect";     rb[0].replacement = (void *)h_connect_;    rb[0].replaced = (void **)&o_connect;
     rb[1].name = "getaddrinfo"; rb[1].replacement = (void *)h_getaddrinfo_; rb[1].replaced = (void **)&o_getaddrinfo;
     rb[2].name = "sendto";      rb[2].replacement = (void *)h_sendto_;     rb[2].replaced = (void **)&o_sendto;
     rb[3].name = "sendmsg";     rb[3].replacement = (void *)h_sendmsg_;    rb[3].replaced = (void **)&o_sendmsg;
     int rc = rebind_symbols(rb, 4);
-    NLog("fishhook rc=%d orig=%d/%d/%d/%d",
-         rc, o_connect ? 1 : 0, o_getaddrinfo ? 1 : 0, o_sendto ? 1 : 0, o_sendmsg ? 1 : 0);
+    if (!logged) {
+        logged = 1;
+        NLog("fishhook rc=%d orig=%d/%d/%d/%d",
+             rc, o_connect ? 1 : 0, o_getaddrinfo ? 1 : 0, o_sendto ? 1 : 0, o_sendmsg ? 1 : 0);
+    }
+}
+
+// 每 3 秒重新 rebind 一次：beta.so 由 Agent 动态 dlopen，constructor 时它还不在镜像列表里
+static void NRebindLoop(void) {
+    while (1) {
+        sleep(3);
+        @autoreleasepool { NInstallHooks(); }
+    }
 }
 
 // ---------------- 核心处理 ----------------
@@ -291,5 +301,8 @@ static void BSNetInit(void) {
         NConfLoad();
         NInstallHooks();
         NLog("net layer installed mode=fishhook+interpose enable=%d", n_enable);
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            @autoreleasepool { NRebindLoop(); }
+        });
     }
 }
