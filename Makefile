@@ -5,7 +5,7 @@ INSTALL_TARGET_PROCESSES = BetaScreenTYMDESUJCX8TAgent BetaScreenTYMDESUJCX8T
 include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = bs_unlock
-bs_unlock_FILES = Tweak.xm BSNet.xm fishhook.c
+bs_unlock_FILES = Tweak.xm BSNet.xm BSSync.xm fishhook.c
 bs_unlock_CFLAGS = -fobjc-arc -w
 bs_unlock_FRAMEWORKS = Foundation UIKit
 

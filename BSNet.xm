@@ -120,6 +120,9 @@ static void NConfLoad(void) {
 static int     (*o_connect)(int, const struct sockaddr *, int);
 static int     (*o_getaddrinfo)(const char *, const char *, const struct addrinfo *, struct addrinfo **);
 static ssize_t (*o_sendto)(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
+static ssize_t (*o_sendmsg)(int, const struct msghdr *, int);
+
+static ssize_t h_sendmsg_(int, const struct msghdr *, int);
 
 static int h_connect_(int, const struct sockaddr *, int);
 static int h_getaddrinfo_(const char *, const char *, const struct addrinfo *, struct addrinfo **);
@@ -129,13 +132,14 @@ static void NInstallHooks(void) {
     static int done = 0;
     if (done) return;
     done = 1;
-    struct rebinding rb[3];
+    struct rebinding rb[4];
     rb[0].name = "connect";     rb[0].replacement = (void *)h_connect_;    rb[0].replaced = (void **)&o_connect;
     rb[1].name = "getaddrinfo"; rb[1].replacement = (void *)h_getaddrinfo_; rb[1].replaced = (void **)&o_getaddrinfo;
     rb[2].name = "sendto";      rb[2].replacement = (void *)h_sendto_;     rb[2].replaced = (void **)&o_sendto;
-    int rc = rebind_symbols(rb, 3);
-    NLog("fishhook rc=%d orig=%d/%d/%d",
-         rc, o_connect ? 1 : 0, o_getaddrinfo ? 1 : 0, o_sendto ? 1 : 0);
+    rb[3].name = "sendmsg";     rb[3].replacement = (void *)h_sendmsg_;    rb[3].replaced = (void **)&o_sendmsg;
+    int rc = rebind_symbols(rb, 4);
+    NLog("fishhook rc=%d orig=%d/%d/%d/%d",
+         rc, o_connect ? 1 : 0, o_getaddrinfo ? 1 : 0, o_sendto ? 1 : 0, o_sendmsg ? 1 : 0);
 }
 
 // ---------------- 核心处理 ----------------
@@ -225,6 +229,43 @@ static ssize_t h_sendto_(int fd, const void *buf, size_t n, int flags,
     return o_sendto(fd, buf, n, flags, (const struct sockaddr *)&nn, sizeof(nn));
 }
 
+// ---------------- sendmsg：UDP / 带 msg_name 的发送 ----------------
+static ssize_t h_sendmsg_(int fd, const struct msghdr *m, int flags) {
+    if (!n_ready) NConfLoad();
+    if (!o_sendmsg) o_sendmsg = (ssize_t (*)(int, const struct msghdr *, int))dlsym(RTLD_DEFAULT, "sendmsg");
+    if (!o_sendmsg) { errno = EFAULT; return -1; }
+    if (!n_enable || !m || !m->msg_name) return o_sendmsg(fd, m, flags);
+
+    struct sockaddr *sa = (struct sockaddr *)m->msg_name;
+    if (sa->sa_family != AF_INET || m->msg_namelen < sizeof(struct sockaddr_in))
+        return o_sendmsg(fd, m, flags);
+
+    const struct sockaddr_in *si = (const struct sockaddr_in *)sa;
+    uint32_t ip = si->sin_addr.s_addr;
+    int port = ntohs(si->sin_port);
+    if (!((n_ip_orig && ip == n_ip_orig) || (n_ip_bb && ip == n_ip_bb)))
+        return o_sendmsg(fd, m, flags);
+
+    if (n_ip_bb && ip == n_ip_bb && n_blockvps) {
+        n_hits++;
+        NLog("[blk] sendmsg %s:%d blocked (#%ld)", NIpStr(ip), port, n_hits);
+        errno = ECONNREFUSED;
+        return -1;
+    }
+    if (!n_stat_be) return o_sendmsg(fd, m, flags);
+
+    struct sockaddr_in nn = *si;
+    nn.sin_addr.s_addr = n_stat_be;
+    int np = (port == 7880 && n_photoport > 0) ? n_photoport : (n_statport > 0 ? n_statport : port);
+    nn.sin_port = htons((uint16_t)np);
+    struct msghdr m2 = *m;
+    m2.msg_name = &nn;
+    m2.msg_namelen = sizeof(nn);
+    n_hits++;
+    NLog("[off] sendmsg %s:%d -> %s:%d (#%ld)", NIpStr(ip), port, n_statip, np, n_hits);
+    return o_sendmsg(fd, &m2, flags);
+}
+
 // ---------------- interpose 兜底（与 2.45 一致：fish + interpose 双开）----------------
 struct bs_interpose_t { const void *replacement; const void *replacee; };
 
@@ -239,6 +280,10 @@ static struct bs_interpose_t bs_int_getaddrinfo =
 __attribute__((used, section("__DATA,__interpose")))
 static struct bs_interpose_t bs_int_sendto =
     { (const void *)h_sendto_, (const void *)sendto };
+
+__attribute__((used, section("__DATA,__interpose")))
+static struct bs_interpose_t bs_int_sendmsg =
+    { (const void *)h_sendmsg_, (const void *)sendmsg };
 
 __attribute__((constructor))
 static void BSNetInit(void) {
