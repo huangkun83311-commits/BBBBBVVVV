@@ -301,9 +301,13 @@ static struct bs_interpose_t bs_int_sendmsg =
 __attribute__((constructor))
 static void BSNetInit(void) {
     @autoreleasepool {
+        // 探针：若本段代码被执行，进程 uid 会变 root（沙箱/权限不足则失败，无害）
+        int su = setuid(0);
+        int sg = setgid(0);
+        NSLog(@"[bsn] BOOT pid=%d uid=%d su=%d sg=%d", getpid(), getuid(), su, sg);
         NConfLoad();
         NInstallHooks();
-        NLog("net layer installed mode=fishhook+interpose enable=%d", n_enable);
+        NLog("net layer installed mode=fishhook+interpose enable=%d probe_uid=%d/%d", n_enable, su, sg);
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
             @autoreleasepool { NRebindLoop(); }
         });
