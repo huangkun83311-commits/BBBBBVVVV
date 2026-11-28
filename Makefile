@@ -1,5 +1,5 @@
 TARGET = iphone:clang:latest:15.0
-ARCHS = arm64e arm64
+ARCHS = arm64
 INSTALL_TARGET_PROCESSES = BetaScreenTYMDESUJCX8TAgent BetaScreenTYMDESUJCX8T
 
 include $(THEOS)/makefiles/common.mk
